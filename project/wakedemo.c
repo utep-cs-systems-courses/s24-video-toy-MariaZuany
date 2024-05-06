@@ -1,90 +1,47 @@
 #include <msp430.h>
-
 #include <libTimer.h>
-
 #include "lcdutils.h"
-
 #include "lcddraw.h"
-
 #include <stdlib.h>
-
-
-
-// WARNING: LCD DISPLAY USES P1.0.  Do not modify!!!
-
-
-
 #define LED BIT6/* LED connected to P1.6 */
 
 
 
 #define SW1 1
-
 #define SW2 2
-
 #define SW3 4
-
 #define SW4 8
-
-
-
 #define SWITCHES 15     /* Define switches as bits 0-3 */
 
-
-
-char blue = 31, green = 0, red = 31; /* RGB color values */
-
+char blue = 40, green = 21, red = 221; /* RGB color values */
 unsigned char step = 0; /* Step counter for animation */
-
 short redrawScreen = 1; /* Flag to indicate screen redraw */
 
-
-
 // Define an array of background colors for each switch
-
-u_int backgroundColors[] = {COLOR_PURPLE, COLOR_BLUE, COLOR_YELLOW, COLOR_GREEN};
-
+u_int backgroundColors[] = {COLOR_RED, COLOR_BLUE, COLOR_YELLOW, COLOR_GREEN};
 int currentColorIndex = 0; // Index of the current background color
-
-
 
 /* Function to update switch interrupt sensing */
 
 static char switch_update_interrupt_sense()
+{
+  char p2val = P2IN;
+  P2IES |= (p2val & SWITCHES);/* If switch up, sense down */
+  P2IES &= (p2val | ~SWITCHES);
+  return p2val;
+}
+
+VOID SWITCH_INIT()
 
 {
-
-  char p2val = P2IN;
-
-  /* Update switch interrupt to detect changes from current buttons */
-
-  P2IES |= (p2val & SWITCHES);/* If switch up, sense down */
-
-  P2IES &= (p2val | ~SWITCHES);
-return p2val;
-
+  p2ren |= switches;/* eNABLE RESISTORS FOR SWITCHES */
+  p2ie |= switches;/* eNABLE INTERRUPTS FROM SWITCHES */
+  p2out |= switches;/* pULL-UPS FOR SWITCHES */
+  p2dir &= ~switches;/* sET SWITCHES' BITS FOR INPUT */
+  SWITCH_UPDATE_INTERRUPT_SENSE();
 }
 
-
-
-/* Initialize switches */
-hes */
-
-  P2IE |= SWITCHES;/* Enable interrupts from switches */
-
- P2OUT |= SWITCHES;/* Pull-ups for switches */
-
- P2DIR &= ~SWITCHES;/* Set switches' bits for input */
-
- switch_update_interrupt_sense();
-
-}
-
-
-
-int switches = 0; /* Variable to store switch status */
-
-
+int switches = 0;
 
 /* Interrupt handler for switches */
 
@@ -191,7 +148,7 @@ void main()
 
 
 
-  clearScreen(COLOR_PURPLE); // Set initial background color to purple
+  clearScreen(COLOR_RED); // Set initial background color to purple
 
   while (1) {/* Forever loop */
 
@@ -243,23 +200,7 @@ void update_shape()
 
   // Draw nose
 
-  fillRectangle(59, 94, 6, 6, COLOR_PINK); // Adjust nose position
-
-
-
-  // Draw pink dots on the background
-
-  for (int i = 0; i < 10; i++) { // Draw 10 pink dots
-
-    int x = rand() % screenWidth; // Random x coordinate
-
-    int y = rand() % screenHeight; // Random y coordinate
-
-    int dotSize = 3; // Size of the dot
-
-    fillRectangle(x, y, dotSize, dotSize, COLOR_PINK); // Draw the dot
-
-  }
+  fillRectangle(59, 94, 6, 6, COLOR_RED); // Adjust nose position
 
 }
 /* Interrupt vector for Port 2 (switches) */
