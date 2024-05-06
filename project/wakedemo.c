@@ -1,126 +1,210 @@
 #include <msp430.h>
+
 #include <libTimer.h>
+
 #include "lcdutils.h"
+
 #include "lcddraw.h"
-#include <stdlib.h>
-#define LED BIT6/* LED connected to P1.6 */
+
+
+
+// WARNING: LCD DISPLAY USES P1.0.  Do not touch!!!
+
+
+
+#define LED BIT6/* note that bit zero req'd for display */
 
 
 
 #define SW1 1
+
 #define SW2 2
+
 #define SW3 4
+
 #define SW4 8
-#define SWITCHES 15     /* Define switches as bits 0-3 */
 
-char blue = 40, green = 21, red = 221; /* RGB color values */
-unsigned char step = 0; /* Step counter for animation */
-short redrawScreen = 1; /* Flag to indicate screen redraw */
 
-// Define an array of background colors for each switch
-u_int backgroundColors[] = {COLOR_RED, COLOR_BLUE, COLOR_YELLOW, COLOR_GREEN};
-int currentColorIndex = 0; // Index of the current background color
 
-/* Function to update switch interrupt sensing */
+#define SWITCHES 15
 
-static char switch_update_interrupt_sense()
+
+
+char blue = 31, green = 0, red = 31;
+
+unsigned char step = 0;
+
+
+
+static char
+
+switch_update_interrupt_sense()
+
 {
+
   char p2val = P2IN;
-  P2IES |= (p2val & SWITCHES);/* If switch up, sense down */
-  P2IES &= (p2val | ~SWITCHES);
+
+  /* update switch interrupt to detect changes from current buttons */
+
+  P2IES |= (p2val & SWITCHES);/* if switch up, sense down */
+
+  P2IES &= (p2val | ~SWITCHES);/* if switch down, sense up */
+
   return p2val;
+
 }
 
-void switch_init()
+
+
+void
+
+switch_init()/* setup switch */
+
 {
-  P2REN |= SWITCHES;/* Enable resistors for switches */
-  P2IE |= SWITCHES;/* Enable interrupts from switches */
-  P2OUT |= SWITCHES;/* Pull-ups for switches */
-  P2DIR &= ~SWITCHES;
-  switch_update_interrupt_sense();
-}
 
+  P2REN |= SWITCHES;/* enables resistors for switches */
+
+  P2IE |= SWITCHES;/* enable interrupts from switches */
+
+  P2OUT |= SWITCHES;/* pull-ups for switches */
+
+  P2DIR &= ~SWITCHES;/* set switches' bits for input */
+
+  switch_update_interrupt_sense();
+
+}
 int switches = 0;
 
-/* Interrupt handler for switches */
 
-void switch_interrupt_handler()
 
-{ char p2val = switch_update_interrupt_sense();
+void
+
+switch_interrupt_handler()
+
+{
+
+  char p2val = switch_update_interrupt_sense();
 
   switches = ~p2val & SWITCHES;
 
-
-
-  // Determine which switch was pressed and set the background color accordingly
-
-  if (switches & SW1)
-
-    currentColorIndex = 0; // Set background to the first color for SW1
-
-  else if (switches & SW2)
-
-    currentColorIndex = 1; // Set background to the second color for SW2
-
-  else if (switches & SW3)
-
-    currentColorIndex = 2; // Set background to the third color for SW3
-
-  else if (switches & SW4)
-
-    currentColorIndex = 3; // Set background to the fourth color for SW4
-
-
-
-  clearScreen(backgroundColors[currentColorIndex]); // Set the new background color
-
-  redrawScreen = 1; // Flag for screen redraw
-
 }
-u_int controlFontColor = COLOR_GREEN; /* Color for text */
 
 
 
-/* Watchdog Timer interrupt handler */
 
-void wdt_c_handler()
+
+// axis zero for col, axis 1 for row
+
+
+
+short drawPos[2] = {1,10}, controlPos[2] = {2, 10};
+
+short colVelocity = 1, colLimits[2] = {1, screenWidth/2};
+
+
+
+void
+
+draw_ball(int col, int row, unsigned short color)
 
 {
 
-  static int secCount = 0;
+  fillRectangle(col-1, row-1, 3, 3, color);
+
+}
+void
+
+screen_update_ball()
+
+{
+
+  for (char axis = 0; axis < 2; axis ++)
+
+    if (drawPos[axis] != controlPos[axis]) /* position changed? */
+
+      goto redraw;
+
+  return;/* nothing to do */
+
+ redraw:
+
+  draw_ball(drawPos[0], drawPos[1], COLOR_BLUE); /* erase */
+
+  for (char axis = 0; axis < 2; axis ++)
+
+    drawPos[axis] = controlPos[axis];
+
+  draw_ball(drawPos[0], drawPos[1], COLOR_WHITE); /* draw */
+
+}
+
+
+
+
+
+short redrawScreen = 1;
+
+u_int controlFontColor = COLOR_GREEN;
+
+
+
+void wdt_c_handler()
+
+{static int secCount = 0;
 
 
 
   secCount ++;
 
-  if (secCount >= 25) {/* Approximately 1 second */
+  if (secCount >= 25) {/* 10/sec */
 
-    {/* Update bunny */
 
-      if (switches & SW3) green = (green + 1) % 64; /* Change green component */
 
-      if (switches & SW2) blue = (blue + 2) % 32; /* Change blue component */
+    {/* move ball */
 
-      if (switches & SW1) red = (red - 3) % 32; /* Change red component */
+      short oldCol = controlPos[0];
 
-      if (step <= 30)
+      short newCol = oldCol + colVelocity;
 
-	step ++; /* Increment step counter */
+      if (newCol <= colLimits[0] || newCol >= colLimits[1])
+
+	colVelocity = -colVelocity;
 
       else
 
-	step = 0; /* Reset step counter */
+	controlPos[0] = newCol;
 
     }
 
-    secCount = 0; /* Reset second counter */
 
-    redrawScreen = 1; /* Set flag for screen redraw */
+
+    {/* update hourglass */
+
+      if (switches & SW3) green = (green + 1) % 64;
+
+      if (switches & SW2) blue = (blue + 2) % 32;
+
+      if (switches & SW1) red = (red - 3) % 32;
+
+      if (step <= 30)
+
+	step ++;
+
+      else
+
+	step = 0;
+
+      secCount = 0;
+
+    }
+
+    if (switches & SW4) return;
+
+    redrawScreen = 1;
 
   }
 
 }
-
 void update_shape();
 
 
@@ -128,6 +212,8 @@ void update_shape();
 void main()
 
 {
+
+
 
   P1DIR |= LED;/**< Green led on when CPU on */
 
@@ -141,76 +227,111 @@ void main()
 
 
 
-  enableWDTInterrupts();      /**< Enable periodic interrupt */
+  enableWDTInterrupts();      /**< enable periodic interrupt */
 
   or_sr(0x8);              /**< GIE (enable interrupts) */
 
 
 
-  clearScreen(COLOR_RED); // Set initial background color to purple
+  clearScreen(COLOR_BLUE);
 
-  while (1) {/* Forever loop */
+  while (1) {/* forever */
 
     if (redrawScreen) {
 
-      redrawScreen = 0; /* Reset redraw flag */
+      redrawScreen = 0;
 
-      update_shape(); /* Update shape on screen */
+      update_shape();
 
     }
 
-    P1OUT &= ~LED;/* Turn off LED */
+    P1OUT &= ~LED;/* led off */
 
     or_sr(0x10);/**< CPU OFF */
 
-    P1OUT |= LED;/* Turn on LED */
+    P1OUT |= LED;/* led on */
+
+  }
+
+}
+void
+
+screen_update_hourglass()
+
+{
+
+  static unsigned char row = screenHeight / 2, col = screenWidth / 2;
+
+  static char lastStep = 0;
+
+
+
+  if (step == 0 || (lastStep > step)) {
+
+    clearScreen(COLOR_BLUE);
+
+    lastStep = 0;
+
+  } else {
+
+    for (; lastStep <= step; lastStep++) {
+
+      int startCol = col - lastStep;
+
+      int endCol = col + lastStep;
+
+      int width = 1 + endCol - startCol;
+
+
+
+      // a color in this BGR encoding is BBBB BGGG GGGR RRRR
+
+      unsigned int color = (blue << 11) | (green << 5) | red;
+
+
+
+      fillRectangle(startCol, row+lastStep, width, 1, color);
+
+      fillRectangle(startCol, row-lastStep, width, 1, color);
+
+    }
 
   }
 
 }
 
-void update_shape()
+
+
+
+
+
+
+void
+
+update_shape()
 
 {
+  screen_update_ball();
 
-  // Draw head
-
-  fillRectangle(31, 69, 64, 45, COLOR_WHITE);
-
-  // Draw left ear
-
-  fillRectangle(31, 39, 16, 30, COLOR_WHITE);
-
-  // Draw right ear
-
-  fillRectangle(79, 39, 16, 30, COLOR_WHITE);
-
-  // Draw inner ear
-
-  fillRectangle(35, 44, 8, 25, COLOR_PINK);
-
-  fillRectangle(83, 44, 8, 25, COLOR_PINK);
-
-  // Draw open eyes
-
-  fillRectangle(43, 84, 10, 10, COLOR_BLUE); // Adjust eyes position and color
-
-  fillRectangle(73, 84, 10, 10, COLOR_BLUE); // Adjust eyes position and color
-
-  // Draw nose
-
-  fillRectangle(59, 94, 6, 6, COLOR_RED); // Adjust nose position
+  screen_update_hourglass();
 
 }
-/* Interrupt vector for Port 2 (switches) */
 
-void __interrupt_vec(PORT2_VECTOR) Port_2(){
 
-  if (P2IFG & SWITCHES) {      /* Check if a button caused this interrupt */
 
-    P2IFG &= ~SWITCHES;      /* Clear pending switch interrupts */
 
-    switch_interrupt_handler();/* Call switch interrupt handler */
+
+
+
+void
+
+__interrupt_vec(PORT2_VECTOR) Port_2(){
+
+  if (P2IFG & SWITCHES) {      /* did a button cause this interrupt? */
+
+    P2IFG &= ~SWITCHES;      /* clear pending sw interrupts */
+
+    switch_interrupt_handler();/* single handler for all switches */
 
   }
 
