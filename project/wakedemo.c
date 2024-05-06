@@ -31,14 +31,13 @@ static char switch_update_interrupt_sense()
   return p2val;
 }
 
-VOID SWITCH_INIT()
-
+void switch_init()
 {
   p2ren |= switches;/* eNABLE RESISTORS FOR SWITCHES */
   p2ie |= switches;/* eNABLE INTERRUPTS FROM SWITCHES */
   p2out |= switches;/* pULL-UPS FOR SWITCHES */
   p2dir &= ~switches;/* sET SWITCHES' BITS FOR INPUT */
-  SWITCH_UPDATE_INTERRUPT_SENSE();
+  switch_update_interrupt_sense();
 }
 
 int switches = 0;
