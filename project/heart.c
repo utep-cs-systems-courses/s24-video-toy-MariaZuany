@@ -1,8 +1,8 @@
-#include "kitty_cat.h"
+#include "heart.h"
 
 
 
-// Pixel data for the heart image (replace kitty_cat data with heart data)
+// Pixel data for the heart image
 
 const unsigned short heart[20 * 20] = {
 
