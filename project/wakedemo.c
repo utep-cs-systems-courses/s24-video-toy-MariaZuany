@@ -60,7 +60,7 @@ static char switch_update_interrupt_sense()
 
   P2IES |= (p2val & SWITCHES);/* If switch up, sense down */
 
-  P2IES &= (p2val | ~SWITCHES);/*
+  P2IES &= (p2val | ~SWITCHES);
 return p2val;
 
 }
